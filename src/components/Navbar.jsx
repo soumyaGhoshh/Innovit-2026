@@ -15,7 +15,7 @@ const Navbar = () => {
     };
 
     const handleRegister = () => {
-        window.open('https://forms.gle/RjPbxwcGKTjqym6G7', '_blank');
+        window.open('https://forms.gle/cA9QiQkBwetCixSu6', '_blank');
         setIsMenuOpen(false);
     };
 
@@ -76,7 +76,7 @@ const Navbar = () => {
                         onClick={handleRegister}
                         className="hidden px-4 py-2 text-sm transition-transform rounded-full md:block btn-primary sm:px-6 hover:scale-105"
                     >
-                        Submit Prototype
+                         Rush Arena
                     </button>
 
                     {/* Mobile Hamburger Button */}
@@ -126,7 +126,7 @@ const Navbar = () => {
                                     onClick={handleRegister}
                                     className="px-4 py-2 mt-2 text-sm rounded-lg btn-primary"
                                 >
-                                    Submit Prototype
+                                    Rush Arena
                                 </button>
                             </div>
                         </div>

@@ -19,7 +19,7 @@ const RegisterToast = () => {
     };
 
     const handleRegister = () => {
-        window.open('https://forms.gle/RjPbxwcGKTjqym6G7', '_blank');
+        window.open('https://forms.gle/cA9QiQkBwetCixSu6', '_blank');
         setIsVisible(false);
     };
 
@@ -49,10 +49,10 @@ const RegisterToast = () => {
                             </div>
                             <div className="flex-1 pr-4">
                                 <h3 className="text-sm font-bold sm:text-base gradient-text">
-                                    Phase 2 Submission Open !!!
+                                    Rush Arena @ Advitya 2026
                                 </h3>
                                 <p className="text-xs text-[#fff1ce]/80">
-                                    Submit your prototype now
+                                    Register for Blockchain Club event
                                 </p>
                             </div>
                         </div>
@@ -62,7 +62,7 @@ const RegisterToast = () => {
                             onClick={handleRegister}
                             className="w-full py-2 text-sm font-semibold transition-transform btn-primary rounded-xl hover:scale-105"
                         >
-                            Submit Now →
+                            Register Now →
                         </button>
                     </div>
                 </motion.div>

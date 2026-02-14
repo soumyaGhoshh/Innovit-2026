@@ -45,11 +45,11 @@ const Hero = () => {
     };
 
     useEffect(() => {
-        const phase1Deadline = new Date('2026-02-13T23:59:59');
+        const finaleDate = new Date('2026-02-28T10:00:00');
 
         const timer = setInterval(() => {
             const now = new Date();
-            const difference = phase1Deadline - now;
+            const difference = finaleDate - now;
 
             if (difference > 0) {
                 setTimeLeft({
@@ -286,19 +286,14 @@ const Hero = () => {
                         <div className="glass px-3 py-1.5 rounded-lg text-white/90 border border-india-green-400/20">
                             <span className="text-india-green-400">📅</span> Finale: Feb 28, 2026
                         </div>
-                        <a
-                            href="https://forms.gle/vbYnvFGaUz3AU1nJA"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="glass px-3 py-1.5 rounded-lg text-white/90 hover:text-saffron-400 border border-saffron-400/20 hover:border-saffron-400/60 hover:bg-saffron-400/10 transition-all duration-200 cursor-pointer"
-                        >
-                            <span className="text-saffron-400">📅</span> Phase 2 Phase Live ....
-                        </a>
+                        <div className="glass px-3 py-1.5 rounded-lg text-white/90 border border-orange-400/20">
+                            <span className="text-orange-400">🔍</span> Phase 2 Evaluation in Progress
+                        </div>
                     </Reveal>
 
                     {/* Countdown Timer */}
                     <Reveal className="px-4 mb-8" delay={0.6}>
-                        <p className="mb-3 text-xs font-extrabold tracking-wider uppercase sm:text-lg text-white/90">Phase 2 [ Prototype Submission ] Ends in </p>
+                        <p className="mb-3 text-xs font-extrabold tracking-wider uppercase sm:text-lg text-white/90">Grand Finale in </p>
                         <div className="flex justify-center gap-2 sm:gap-3 md:gap-4">
                             {[
                                 { label: 'Days', value: timeLeft.days, color: '#FF9933' },

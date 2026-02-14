@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Sparkles, Award, Users } from 'lucide-react';
 import Papa from 'papaparse';
+import Phase2Results from './Phase2Results';
 
 const Results = () => {
+    const [mainTab, setMainTab] = useState('phase1'); // 'phase1' or 'phase2'
     const [activeTab, setActiveTab] = useState(0);
     const [results, setResults] = useState({});
     const [loading, setLoading] = useState(true);
@@ -96,17 +98,51 @@ const Results = () => {
                     <div className="flex items-center justify-center gap-3 mb-4">
                         <Trophy className="w-8 h-8 text-yellow-400 sm:w-10 sm:h-10 md:w-12 md:h-12" />
                         <h1 className="text-2xl font-bold sm:text-3xl md:text-5xl lg:text-6xl gradient-text">
-                            Phase 1 Results
+                            Results
                         </h1>
                         <Sparkles className="w-8 h-8 text-yellow-400 sm:w-10 sm:h-10 md:w-12 md:h-12" />
                     </div>
                     <p className="max-w-3xl px-2 mx-auto text-sm sm:text-base md:text-lg lg:text-xl text-white/80">
                         🎉 Congratulations to all qualified teams! 🎉
                     </p>
-                    
                 </motion.div>
 
-                {/* Tabs */}
+                {/* Main Phase Tabs */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                    className="flex justify-center gap-4 mb-8 sm:mb-10"
+                >
+                    <button
+                        onClick={() => setMainTab('phase1')}
+                        className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl text-base sm:text-lg font-bold transition-all duration-300 ${
+                            mainTab === 'phase1'
+                                ? 'bg-gradient-to-br from-saffron-400 to-amber-500 text-white shadow-2xl scale-105'
+                                : 'glass-strong text-white/80 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        Phase 1
+                    </button>
+                    <button
+                        onClick={() => setMainTab('phase2')}
+                        className={`px-6 py-3 sm:px-8 sm:py-4 rounded-xl text-base sm:text-lg font-bold transition-all duration-300 ${
+                            mainTab === 'phase2'
+                                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-2xl scale-105'
+                                : 'glass-strong text-white/80 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        Phase 2
+                    </button>
+                </motion.div>
+
+                {/* Phase 2 Results */}
+                {mainTab === 'phase2' && <Phase2Results />}
+
+                {/* Phase 1 Results */}
+                {mainTab === 'phase1' && (
+                    <>
+                        {/* Theme Tabs */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -223,6 +259,8 @@ const Results = () => {
                         </div>
                     </motion.div>
                 </AnimatePresence>
+                    </>
+                )}
             </div>
         </section>
     );
