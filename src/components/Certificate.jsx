@@ -38,7 +38,7 @@ const Certificate = () => {
   const [iframeScale, setIframeScale] = useState(1);
   const containerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('phase1'); // 'phase1', 'phase2', 'officials'
-  const [officialRole, setOfficialRole] = useState('mentor'); // 'mentor', 'volunteer', 'judge', 'student_coordinator'
+  const [officialRole, setOfficialRole] = useState('judge'); // 'judge', 'volunteer', 'student_coordinator'
 
   useEffect(() => {
     const updateScale = () => {
@@ -171,34 +171,81 @@ const Certificate = () => {
     setVerifiedTheme(null);
     setPdfPreviewUrl(null);
 
-    // Simulate verification for frontend demo
-    setTimeout(async () => {
-      const dummyData = {
-        name: "John Doe",
-        team: "Innovit official team",
-        email_id: formData.email,
-        certificate_hash_id: "OFFICIAL-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
-        role: officialRole
-      };
+    try {
+      // Map dropdown role to database role
+      let dbRole = officialRole;
+      if (officialRole === 'judge') dbRole = 'mentor';
+
+      const { data, error } = await supabase
+        .from('id_card_users')
+        .select('*')
+        .eq('email_id', formData.email)
+        .eq('user_type', dbRole)
+        .single();
+
+      if (error || !data) {
+        throw new Error('User not found or role mismatch');
+      }
+
+      // If certificate_hash_id is missing, generate one and save it to the database
+      if (!data.certificate_hash_id) {
+        const prefix = officialRole === 'judge' ? 'JUD-' :
+          officialRole === 'volunteer' ? 'VOL-' : 'CRD-';
+        const newId = prefix + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+        // Save to database
+        const { error: updateError } = await supabase
+          .from('id_card_users')
+          .update({ certificate_hash_id: newId })
+          .eq('id', data.id);
+
+        if (updateError) {
+          console.error('Error saving certificate ID:', updateError);
+          throw new Error('Failed to generate and save certificate ID');
+        }
+
+        // Update local data
+        data.certificate_hash_id = newId;
+      }
 
       const roleDisplay = officialRole.toUpperCase().replace('_', ' ');
       const dummyTheme = { id: roleDisplay, name: "INNOVIT 2026 OFFICIAL" };
 
-      setUserData(dummyData);
+      setUserData(data);
       setVerifiedTheme(dummyTheme);
 
       // Generate PDF Preview
-      await updatePdfPreview(dummyData, dummyTheme);
+      await updatePdfPreview(data, dummyTheme);
 
       setIsVerifying(false);
       toast.success(`Verified! Your ${officialRole.replace('_', ' ')} certificate is ready.`);
-    }, 1500);
+    } catch (error) {
+      console.error('Verification failed:', error);
+      toast.error(error.message || 'Verification failed. Please check your email and role.');
+      setIsVerifying(false);
+    }
   };
 
 
   const generateCertificateBlob = async (userData, verifiedTheme) => {
+    // Determine if this is an official certificate based on user_type or activeTab/verifiedTheme
+    const isOfficial = ['mentor', 'judge', 'volunteer', 'student_coordinator'].includes(userData.user_type) || verifiedTheme.id === 'JUDGE' || verifiedTheme.id === 'VOLUNTEER' || verifiedTheme.id === 'STUDENT COORDINATOR';
+
+    let templateUrl = '/phase-1-innovit_certitcate (1).pdf';
+
+    if (isOfficial) {
+      // Map role to template file
+      // Note: verifiedTheme.id comes from handleVerifyOfficial as uppercased role
+      if (verifiedTheme.id === 'JUDGE' || userData.user_type === 'mentor') {
+        templateUrl = '/JUDGE.pdf';
+      } else if (verifiedTheme.id === 'VOLUNTEER' || userData.user_type === 'volunteer') {
+        templateUrl = '/VOLUNTEER.pdf';
+      } else if (verifiedTheme.id === 'STUDENT COORDINATOR' || userData.user_type === 'student_coordinator') {
+        templateUrl = '/STUDENT COORDINATOR.pdf';
+      }
+    }
+
     // Fetch the PDF template
-    const templateUrl = '/phase-1-innovit_certitcate (1).pdf';
     const response = await fetch(templateUrl);
     if (!response.ok) throw new Error('Failed to download template');
     const templateBytes = await response.arrayBuffer();
@@ -218,86 +265,147 @@ const Certificate = () => {
       return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
-    const displayName = formatToTitleCase(userData.name);
-    const displayTeam = formatToTitleCase(userData.team);
-    const combinedNameTeam = `${displayName} | Team: ${displayTeam}`;
+    if (!isOfficial) {
+      // --- PARTICIPANT CERTIFICATE LOGIC ---
+      const displayName = formatToTitleCase(userData.name);
+      const displayTeam = formatToTitleCase(userData.team);
+      const combinedNameTeam = `${displayName} | Team: ${displayTeam}`;
 
-    const nameFontSize = 24;
-    const nameWidth = fontBold.widthOfTextAtSize(combinedNameTeam, nameFontSize);
+      const nameFontSize = 24;
+      const nameWidth = fontBold.widthOfTextAtSize(combinedNameTeam, nameFontSize);
 
-    // Draw Name & Team
-    firstPage.drawText(combinedNameTeam, {
-      x: width / 2 - nameWidth / 2 + 85,
-      y: height - 262,
-      size: nameFontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
-    });
-
-    // Draw Theme
-    const themeText = `${verifiedTheme.id} : ${verifiedTheme.name}`;
-    const themeFontSize = 22;
-    const themeWidth = fontRegular.widthOfTextAtSize(themeText, themeFontSize);
-    firstPage.drawText(themeText, {
-      x: width / 2 - themeWidth / 2 + 85,
-      y: height - 377,
-      size: themeFontSize,
-      font: fontRegular,
-      color: rgb(0.12, 0.16, 0.22),
-    });
-
-    // Draw Date
-    const today = new Date().toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    });
-    const dateFontSize = 12;
-    firstPage.drawText(today, {
-      x: 180,
-      y: height - 718,
-      size: dateFontSize,
-      font: fontRegular,
-      color: rgb(0.12, 0.16, 0.22),
-    });
-
-    // Draw Certificate Hash
-    if (userData.certificate_hash_id) {
-      const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
-      const hashFontSize = 9;
-      const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
-
-      firstPage.drawText(hashText, {
-        x: width / 2 - hashWidth / 2 + 85, // Center + 85 visual offset
-        y: 25, // Lower bottom
-        size: hashFontSize,
-        font: fontRegular,
-        color: rgb(0.3, 0.3, 0.3),
+      // Draw Name & Team
+      firstPage.drawText(combinedNameTeam, {
+        x: width / 2 - nameWidth / 2 + 85,
+        y: height - 262,
+        size: nameFontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
       });
 
-      // Generate and Draw QR Code
-      const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
-      try {
-        const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
-          width: 100,
-          margin: 1,
-          color: {
-            dark: '#000000',
-            light: '#FFFFFF00' // Transparent background
-          }
+      // Draw Theme
+      const themeText = `${verifiedTheme.id} : ${verifiedTheme.name}`;
+      const themeFontSize = 22;
+      const themeWidth = fontRegular.widthOfTextAtSize(themeText, themeFontSize);
+      firstPage.drawText(themeText, {
+        x: width / 2 - themeWidth / 2 + 85,
+        y: height - 377,
+        size: themeFontSize,
+        font: fontRegular,
+        color: rgb(0.12, 0.16, 0.22),
+      });
+
+      // Draw Date
+      const today = new Date().toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      const dateFontSize = 12;
+      firstPage.drawText(today, {
+        x: 180,
+        y: height - 718,
+        size: dateFontSize,
+        font: fontRegular,
+        color: rgb(0.12, 0.16, 0.22),
+      });
+
+      // Draw Certificate Hash
+      if (userData.certificate_hash_id) {
+        const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
+        const hashFontSize = 9;
+        const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
+
+        firstPage.drawText(hashText, {
+          x: width / 2 - hashWidth / 2 + 85,
+          y: 25,
+          size: hashFontSize,
+          font: fontRegular,
+          color: rgb(0.3, 0.3, 0.3),
         });
 
-        const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
-        const qrImage = await pdfDoc.embedPng(qrImageBytes);
+        // Generate and Draw QR Code
+        const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
+        try {
+          const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
+            width: 100,
+            margin: 1,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF00'
+            }
+          });
 
-        firstPage.drawImage(qrImage, {
-          x: width / 2 - 25 + 85, // Center + 85 visual offset
-          y: 40, // Just above the ID (25 + 10 margin = 35, safe at 40)
-          width: 50,
-          height: 50,
+          const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
+          const qrImage = await pdfDoc.embedPng(qrImageBytes);
+
+          firstPage.drawImage(qrImage, {
+            x: width / 2 - 25 + 85,
+            y: 40,
+            width: 50,
+            height: 50,
+          });
+        } catch (qrError) {
+          console.error('Error generating QR code:', qrError);
+        }
+      }
+    } else {
+      // --- OFFICIAL CERTIFICATE LOGIC ---
+      // Coordinates need to be adjusted based on the new templates.
+      // Assuming similar layout or centered text for now.
+
+      const displayName = formatToTitleCase(userData.name);
+      const nameFontSize = 30; // Slightly larger for officials
+      const nameWidth = fontBold.widthOfTextAtSize(displayName, nameFontSize);
+
+      // Center Name - Approximate Y position, adjust as needed
+      firstPage.drawText(displayName, {
+        x: width / 2 - nameWidth / 2,
+        y: height / 2 + 20, // Approximate center
+        size: nameFontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
+      });
+
+      // Draw Certificate Hash & QR
+      if (userData.certificate_hash_id) {
+        const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
+        const hashFontSize = 10;
+        const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
+
+        // Bottom Center for ID (matching participant style)
+        firstPage.drawText(hashText, {
+          x: width / 2 - hashWidth / 2,
+          y: 25,
+          size: hashFontSize,
+          font: fontRegular,
+          color: rgb(0.3, 0.3, 0.3),
         });
-      } catch (qrError) {
-        console.error('Error generating QR code:', qrError);
+
+        // QR Code - Center above ID (matching participant style)
+        const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
+        try {
+          const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
+            width: 100,
+            margin: 1,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF00'
+            }
+          });
+
+          const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
+          const qrImage = await pdfDoc.embedPng(qrImageBytes);
+
+          firstPage.drawImage(qrImage, {
+            x: width / 2 - 25, // Centered
+            y: 40,
+            width: 50,
+            height: 50,
+          });
+        } catch (qrError) {
+          console.error('Error generating QR code:', qrError);
+        }
       }
     }
 
@@ -733,7 +841,6 @@ const Certificate = () => {
                         onChange={(e) => setOfficialRole(e.target.value)}
                         className="w-full px-4 py-4 bg-[#0a0a0f]/80 border border-yellow-500/20 rounded-2xl text-white focus:outline-none focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all font-medium appearance-none"
                       >
-                        <option value="mentor">Mentor</option>
                         <option value="judge">Judge</option>
                         <option value="volunteer">Volunteer</option>
                         <option value="student_coordinator">Student Coordinator</option>
