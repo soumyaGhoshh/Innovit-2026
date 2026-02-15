@@ -7,7 +7,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
-import Phase1Certificate from './Phase1Certificate';
+import usePhase1Certificate from './Phase1Certificate';
 
 const Certificate = () => {
   const navigate = useNavigate();
@@ -29,7 +29,6 @@ const Certificate = () => {
   const containerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('phase1'); // 'phase1', 'phase2', 'officials'
   const [officialRole, setOfficialRole] = useState('judge'); // 'judge', 'volunteer', 'student_coordinator'
-  const phase1Ref = useRef(null);
 
   useEffect(() => {
     const updateScale = () => {
@@ -328,6 +327,17 @@ const Certificate = () => {
     });
   };
 
+  // Call Phase 1 hook at top level (hooks must always be called unconditionally)
+  const phase1Data = usePhase1Certificate({
+    onShare: handleShare,
+    pdfPreviewUrl,
+    setPdfPreviewUrl,
+    isPreviewLoading,
+    setIsPreviewLoading,
+    qrCodeUrl,
+    setQrCodeUrl
+  });
+
   return (
     <div className="min-h-screen w-full pt-24 pb-12 px-4 relative overflow-hidden bg-[#0a0a0f]">
       <Toaster
@@ -526,19 +536,7 @@ const Certificate = () => {
                 ))}
               </div>
 
-              {activeTab === 'phase1' && (() => {
-                const Phase1Component = Phase1Certificate({ 
-                  onShare: handleShare,
-                  pdfPreviewUrl,
-                  setPdfPreviewUrl,
-                  isPreviewLoading,
-                  setIsPreviewLoading,
-                  qrCodeUrl,
-                  setQrCodeUrl
-                });
-                phase1Ref.current = Phase1Component;
-                return Phase1Component.formContent;
-              })()}
+              {activeTab === 'phase1' && phase1Data.formContent}
 
               {activeTab === 'phase2' && (
                 <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -706,7 +704,7 @@ const Certificate = () => {
                       </div>
 
                       {/* Phase 1 Certificate Actions Below Preview */}
-                      {phase1Ref.current?.previewActions}
+                      {phase1Data.previewActions}
                     </motion.div>
                   ) : (
                     <motion.div

@@ -15,7 +15,7 @@ const themes = [
   { id: 'TH05', name: 'Blockchain & Cybersecurity', color: '#1E3A8A' }
 ];
 
-const Phase1Certificate = ({ 
+const usePhase1Certificate = ({ 
   onShare, 
   pdfPreviewUrl, 
   setPdfPreviewUrl, 
@@ -663,4 +663,4 @@ const Phase1Certificate = ({
   };
 };
 
-export default Phase1Certificate;
+export default usePhase1Certificate;
