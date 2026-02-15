@@ -6,17 +6,8 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import toast, { Toaster } from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-
-import Papa from 'papaparse';
 import QRCode from 'qrcode';
-
-const themes = [
-  { id: 'TH01', name: 'Open Innovation', color: '#FF9933' },
-  { id: 'TH02', name: 'Heritage & Culture', color: '#FFFFFF' },
-  { id: 'TH03', name: 'MedTech / BioTech / HealthTech', color: '#138808' },
-  { id: 'TH04', name: 'Agriculture, FoodTech & Rural Development', color: '#FF9933' },
-  { id: 'TH05', name: 'Blockchain & Cybersecurity', color: '#1E3A8A' }
-];
+import Phase1Certificate from './Phase1Certificate';
 
 const Certificate = () => {
   const navigate = useNavigate();
@@ -25,7 +16,6 @@ const Certificate = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [userData, setUserData] = useState(null);
   const [verifiedTheme, setVerifiedTheme] = useState(null);
-  const [results, setResults] = useState({});
   const [formData, setFormData] = useState({
     email: '',
     name: '',
@@ -39,20 +29,19 @@ const Certificate = () => {
   const containerRef = useRef(null);
   const [activeTab, setActiveTab] = useState('phase1'); // 'phase1', 'phase2', 'officials'
   const [officialRole, setOfficialRole] = useState('judge'); // 'judge', 'volunteer', 'student_coordinator'
+  const phase1Ref = useRef(null);
 
   useEffect(() => {
     const updateScale = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
-        // Base width for PDF preview (A4 Landscape at ~133dpi or high density)
-        // 1122 is a good balance for quality and scaling
         const pdfBaseWidth = 1122;
         setIframeScale(containerWidth / pdfBaseWidth);
       }
     };
 
     updateScale();
-    const timer = setTimeout(updateScale, 500); // Delayed check for animation completion
+    const timer = setTimeout(updateScale, 500);
 
     window.addEventListener('resize', updateScale);
     return () => {
@@ -60,31 +49,6 @@ const Certificate = () => {
       clearTimeout(timer);
     };
   }, [userData, pdfPreviewUrl]);
-
-  // Load results from all 5 theme CSV files
-  useEffect(() => {
-    const loadAllResults = async () => {
-      const resultsData = {};
-
-      for (const theme of themes) {
-        try {
-          const response = await fetch(`/Result-Phase-1/${theme.id}.csv`);
-          if (!response.ok) throw new Error(`Failed to fetch ${theme.id}.csv`);
-          const csvText = await response.text();
-
-          const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-          resultsData[theme.id] = result.data;
-        } catch (error) {
-          console.error(`Error loading ${theme.id}:`, error);
-          resultsData[theme.id] = [];
-        }
-      }
-
-      setResults(resultsData);
-    };
-
-    loadAllResults();
-  }, []);
 
   // Clean up PDF preview URL on unmount or change
   useEffect(() => {
@@ -95,69 +59,48 @@ const Certificate = () => {
     };
   }, [pdfPreviewUrl]);
 
-  const updatePdfPreview = async (data, theme) => {
-    setIsPreviewLoading(true);
-    try {
-      if (pdfPreviewUrl) {
-        URL.revokeObjectURL(pdfPreviewUrl);
-      }
-      const blob = await generateCertificateBlob(data, theme);
-      const url = URL.createObjectURL(blob);
-      setPdfPreviewUrl(url);
-    } catch (error) {
-      console.error('Preview generation failed', error);
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleVerifyUser = async () => {
-    if (!formData.email) {
-      toast.error('Please enter your email address');
+  const handleShare = async (shareUserData) => {
+    const userToShare = shareUserData || userData;
+    if (!userToShare || !userToShare.certificate_hash_id) {
+      toast.error('Please verify your certificate first');
       return;
     }
 
-    setIsVerifying(true);
-    setUserData(null);
-    setVerifiedTheme(null);
-    if (pdfPreviewUrl) {
-      URL.revokeObjectURL(pdfPreviewUrl);
-      setPdfPreviewUrl(null);
-    }
-
+    // Generate QR code for share modal
     try {
-      // Pure frontend simulation for Phase 1 as requested
-      setTimeout(async () => {
-        const dummyData = {
-          name: formData.name || "Test Participant",
-          team: formData.team || "Test Team",
-          email_id: formData.email,
-          certificate_hash_id: "P1-" + Math.random().toString(36).substr(2, 9).toUpperCase()
-        };
-
-        const dummyTheme = { id: "Participation", name: "Phase 1 Hackathon" };
-
-        setUserData(dummyData);
-        setVerifiedTheme(dummyTheme);
-
-        // Generate PDF Preview
-        await updatePdfPreview(dummyData, dummyTheme);
-
-        setIsVerifying(false);
-        toast.success('Verified! Your Phase 1 certificate is ready.');
-      }, 1500);
+      const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userToShare.certificate_hash_id}`;
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeUrl(qrDataUrl);
+      setUserData(userToShare);
     } catch (error) {
-      console.error('Verification process failed:', error);
-      toast.error('An unexpected error occurred during verification.');
-      setIsVerifying(false);
+      console.error('Error generating QR code:', error);
     }
+
+    setIsShareModalOpen(true);
+  };
+
+  const getShareLink = () => {
+    if (!userData?.certificate_hash_id) return '';
+    return `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
+  };
+
+  const handleCopyLink = () => {
+    const link = getShareLink();
+    navigator.clipboard.writeText(link);
+    toast.success('Link copied to clipboard!');
+  };
+
+  const handleCopyCertificateId = () => {
+    if (!userData?.certificate_hash_id) return;
+    navigator.clipboard.writeText(userData.certificate_hash_id);
+    toast.success('Certificate ID copied to clipboard!');
   };
 
   const handleVerifyOfficial = async () => {
@@ -214,8 +157,8 @@ const Certificate = () => {
       setUserData(data);
       setVerifiedTheme(dummyTheme);
 
-      // Generate PDF Preview
-      await updatePdfPreview(data, dummyTheme);
+      // Generate PDF Preview for officials
+      await updateOfficialPdfPreview(data, dummyTheme);
 
       setIsVerifying(false);
       toast.success(`Verified! Your ${officialRole.replace('_', ' ')} certificate is ready.`);
@@ -226,23 +169,46 @@ const Certificate = () => {
     }
   };
 
+  const updateOfficialPdfPreview = async (data, theme) => {
+    setIsPreviewLoading(true);
+    try {
+      if (pdfPreviewUrl) {
+        URL.revokeObjectURL(pdfPreviewUrl);
+      }
+      const blob = await generateOfficialCertificateBlob(data, theme);
+      const url = URL.createObjectURL(blob);
+      setPdfPreviewUrl(url);
 
-  const generateCertificateBlob = async (userData, verifiedTheme) => {
-    // Determine if this is an official certificate based on user_type or activeTab/verifiedTheme
-    const isOfficial = ['mentor', 'judge', 'volunteer', 'student_coordinator'].includes(userData.user_type) || verifiedTheme.id === 'JUDGE' || verifiedTheme.id === 'VOLUNTEER' || verifiedTheme.id === 'STUDENT COORDINATOR';
+      // Generate QR code for preview
+      if (data.certificate_hash_id) {
+        const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${data.certificate_hash_id}`;
+        const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+          width: 256,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        setQrCodeUrl(qrDataUrl);
+      }
+    } catch (error) {
+      console.error('Preview generation failed', error);
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
 
+  const generateOfficialCertificateBlob = async (userData, verifiedTheme) => {
     let templateUrl = '/phase-1-innovit_certitcate (1).pdf';
 
-    if (isOfficial) {
-      // Map role to template file
-      // Note: verifiedTheme.id comes from handleVerifyOfficial as uppercased role
-      if (verifiedTheme.id === 'JUDGE' || userData.user_type === 'mentor') {
-        templateUrl = '/JUDGE.pdf';
-      } else if (verifiedTheme.id === 'VOLUNTEER' || userData.user_type === 'volunteer') {
-        templateUrl = '/VOLUNTEER.pdf';
-      } else if (verifiedTheme.id === 'STUDENT COORDINATOR' || userData.user_type === 'student_coordinator') {
-        templateUrl = '/STUDENT COORDINATOR.pdf';
-      }
+    // Map role to template file
+    if (verifiedTheme.id === 'JUDGE' || userData.user_type === 'mentor') {
+      templateUrl = '/JUDGE.pdf';
+    } else if (verifiedTheme.id === 'VOLUNTEER' || userData.user_type === 'volunteer') {
+      templateUrl = '/VOLUNTEER.pdf';
+    } else if (verifiedTheme.id === 'STUDENT COORDINATOR' || userData.user_type === 'student_coordinator') {
+      templateUrl = '/STUDENT COORDINATOR.pdf';
     }
 
     // Fetch the PDF template
@@ -265,147 +231,56 @@ const Certificate = () => {
       return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
 
-    if (!isOfficial) {
-      // --- PARTICIPANT CERTIFICATE LOGIC ---
-      const displayName = formatToTitleCase(userData.name);
-      const displayTeam = formatToTitleCase(userData.team);
-      const combinedNameTeam = `${displayName} | Team: ${displayTeam}`;
+    const displayName = formatToTitleCase(userData.name);
+    const nameFontSize = 30;
+    const nameWidth = fontBold.widthOfTextAtSize(displayName, nameFontSize);
 
-      const nameFontSize = 24;
-      const nameWidth = fontBold.widthOfTextAtSize(combinedNameTeam, nameFontSize);
+    // Center Name
+    firstPage.drawText(displayName, {
+      x: width / 2 - nameWidth / 2,
+      y: height / 2 + 0,
+      size: nameFontSize,
+      font: fontBold,
+      color: rgb(0, 0, 0),
+    });
 
-      // Draw Name & Team
-      firstPage.drawText(combinedNameTeam, {
-        x: width / 2 - nameWidth / 2 + 85,
-        y: height - 262,
-        size: nameFontSize,
-        font: fontBold,
-        color: rgb(0, 0, 0),
-      });
+    // Draw Certificate Hash & QR
+    if (userData.certificate_hash_id) {
+      const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
+      const hashFontSize = 10;
+      const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
 
-      // Draw Theme
-      const themeText = `${verifiedTheme.id} : ${verifiedTheme.name}`;
-      const themeFontSize = 22;
-      const themeWidth = fontRegular.widthOfTextAtSize(themeText, themeFontSize);
-      firstPage.drawText(themeText, {
-        x: width / 2 - themeWidth / 2 + 85,
-        y: height - 377,
-        size: themeFontSize,
+      firstPage.drawText(hashText, {
+        x: width / 2 - hashWidth / 2,
+        y: 25,
+        size: hashFontSize,
         font: fontRegular,
-        color: rgb(0.12, 0.16, 0.22),
+        color: rgb(0.3, 0.3, 0.3),
       });
 
-      // Draw Date
-      const today = new Date().toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-      const dateFontSize = 12;
-      firstPage.drawText(today, {
-        x: 180,
-        y: height - 718,
-        size: dateFontSize,
-        font: fontRegular,
-        color: rgb(0.12, 0.16, 0.22),
-      });
-
-      // Draw Certificate Hash
-      if (userData.certificate_hash_id) {
-        const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
-        const hashFontSize = 9;
-        const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
-
-        firstPage.drawText(hashText, {
-          x: width / 2 - hashWidth / 2 + 85,
-          y: 25,
-          size: hashFontSize,
-          font: fontRegular,
-          color: rgb(0.3, 0.3, 0.3),
+      // QR Code
+      const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
+      try {
+        const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
+          width: 100,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF00'
+          }
         });
 
-        // Generate and Draw QR Code
-        const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
-        try {
-          const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
-            width: 100,
-            margin: 1,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF00'
-            }
-          });
+        const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
+        const qrImage = await pdfDoc.embedPng(qrImageBytes);
 
-          const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
-          const qrImage = await pdfDoc.embedPng(qrImageBytes);
-
-          firstPage.drawImage(qrImage, {
-            x: width / 2 - 25 + 85,
-            y: 40,
-            width: 50,
-            height: 50,
-          });
-        } catch (qrError) {
-          console.error('Error generating QR code:', qrError);
-        }
-      }
-    } else {
-      // --- OFFICIAL CERTIFICATE LOGIC ---
-      // Coordinates need to be adjusted based on the new templates.
-      // Assuming similar layout or centered text for now.
-
-      const displayName = formatToTitleCase(userData.name);
-      const nameFontSize = 30; // Slightly larger for officials
-      const nameWidth = fontBold.widthOfTextAtSize(displayName, nameFontSize);
-
-      // Center Name - Approximate Y position, adjust as needed
-      firstPage.drawText(displayName, {
-        x: width / 2 - nameWidth / 2,
-        y: height / 2 + 20, // Approximate center
-        size: nameFontSize,
-        font: fontBold,
-        color: rgb(0, 0, 0),
-      });
-
-      // Draw Certificate Hash & QR
-      if (userData.certificate_hash_id) {
-        const hashText = `Certificate ID: ${userData.certificate_hash_id}`;
-        const hashFontSize = 10;
-        const hashWidth = fontRegular.widthOfTextAtSize(hashText, hashFontSize);
-
-        // Bottom Center for ID (matching participant style)
-        firstPage.drawText(hashText, {
-          x: width / 2 - hashWidth / 2,
-          y: 25,
-          size: hashFontSize,
-          font: fontRegular,
-          color: rgb(0.3, 0.3, 0.3),
+        firstPage.drawImage(qrImage, {
+          x: width / 2 - 25,
+          y: 40,
+          width: 50,
+          height: 50,
         });
-
-        // QR Code - Center above ID (matching participant style)
-        const verifyUrl = `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
-        try {
-          const qrCodeDataUrl = await QRCode.toDataURL(verifyUrl, {
-            width: 100,
-            margin: 1,
-            color: {
-              dark: '#000000',
-              light: '#FFFFFF00'
-            }
-          });
-
-          const qrImageBytes = await fetch(qrCodeDataUrl).then(res => res.arrayBuffer());
-          const qrImage = await pdfDoc.embedPng(qrImageBytes);
-
-          firstPage.drawImage(qrImage, {
-            x: width / 2 - 25, // Centered
-            y: 40,
-            width: 50,
-            height: 50,
-          });
-        } catch (qrError) {
-          console.error('Error generating QR code:', qrError);
-        }
+      } catch (qrError) {
+        console.error('Error generating QR code:', qrError);
       }
     }
 
@@ -414,7 +289,7 @@ const Certificate = () => {
     return new Blob([pdfBytes], { type: 'application/pdf' });
   };
 
-  const handleDownloadCertificate = async () => {
+  const handleDownloadOfficialCertificate = async () => {
     if (!userData || !verifiedTheme) {
       toast.error('Please verify your email first');
       return;
@@ -426,11 +301,10 @@ const Certificate = () => {
     try {
       let blob;
       if (pdfPreviewUrl) {
-        // Reuse the blob from preview if available
         const response = await fetch(pdfPreviewUrl);
         blob = await response.blob();
       } else {
-        blob = await generateCertificateBlob(userData, verifiedTheme);
+        blob = await generateOfficialCertificateBlob(userData, verifiedTheme);
       }
 
       const link = document.createElement('a');
@@ -447,49 +321,11 @@ const Certificate = () => {
     }
   };
 
-
-
-
-  const handleShare = async () => {
-    if (!userData || !userData.certificate_hash_id) {
-      toast.error('Please verify your certificate first');
-      return;
-    }
-
-    // Generate QR code for share modal
-    try {
-      const verifyUrl = getShareLink();
-      const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-      setQrCodeUrl(qrDataUrl);
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-    }
-
-    setIsShareModalOpen(true);
-  };
-
-  const getShareLink = () => {
-    if (!userData?.certificate_hash_id) return '';
-    return `https://innovit-2026.blockchainvitb.in/verify-certificate?id=${userData.certificate_hash_id}`;
-  };
-
-  const handleCopyLink = () => {
-    const link = getShareLink();
-    navigator.clipboard.writeText(link);
-    toast.success('Link copied to clipboard!');
-  };
-
-  const handleCopyCertificateId = () => {
-    if (!userData?.certificate_hash_id) return;
-    navigator.clipboard.writeText(userData.certificate_hash_id);
-    toast.success('Certificate ID copied to clipboard!');
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
   };
 
   return (
@@ -690,130 +526,19 @@ const Certificate = () => {
                 ))}
               </div>
 
-              {activeTab === 'phase1' && (
-                <>
-                  <h2 className="flex items-center gap-3 mb-8 text-2xl font-bold text-white">
-                    <ShieldCheck className="w-6 h-6 text-yellow-500" />
-                    Participant Verification
-                  </h2>
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-[#fff1ce] font-semibold mb-3 text-sm uppercase tracking-wider">
-                        Email Address
-                      </label>
-                      <div className="relative">
-                        <Mail className="absolute w-5 h-5 -translate-y-1/2 left-4 top-1/2 text-yellow-400/50" />
-                        <input
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          onChange={handleInputChange}
-                          placeholder="Enter registered email"
-                          className="w-full pl-12 pr-4 py-4 bg-[#0a0a0f]/80 border border-yellow-500/20 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all font-medium"
-                        />
-                      </div>
-                      <p className="mt-2 ml-1 text-xs text-gray-500">Use the email you used during registration.</p>
-                    </div>
-
-                    {!userData && (
-                      <>
-                        <div>
-                          <label className="block text-[#fff1ce] font-semibold mb-3 text-sm uppercase tracking-wider">
-                            Full Name
-                          </label>
-                          <div className="relative">
-                            <User className="absolute w-5 h-5 -translate-y-1/2 left-4 top-1/2 text-yellow-400/50" />
-                            <input
-                              type="text"
-                              name="name"
-                              value={formData.name}
-                              onChange={handleInputChange}
-                              placeholder="Enter your name"
-                              className="w-full pl-12 pr-4 py-4 bg-[#0a0a0f]/80 border border-yellow-500/20 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all font-medium"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[#fff1ce] font-semibold mb-3 text-sm uppercase tracking-wider">
-                            Team Name
-                          </label>
-                          <div className="relative">
-                            <Award className="absolute w-5 h-5 -translate-y-1/2 left-4 top-1/2 text-yellow-400/50" />
-                            <input
-                              type="text"
-                              name="team"
-                              value={formData.team}
-                              onChange={handleInputChange}
-                              placeholder="Enter team name"
-                              className="w-full pl-12 pr-4 py-4 bg-[#0a0a0f]/80 border border-yellow-500/20 rounded-2xl text-white placeholder-gray-600 focus:outline-none focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all font-medium"
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    {userData && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-[#fff1ce] font-semibold mb-3 text-sm uppercase tracking-wider">
-                            Full Name
-                          </label>
-                          <div className="relative">
-                            <User className="absolute w-5 h-5 -translate-y-1/2 left-4 top-1/2 text-yellow-400/50" />
-                            <input
-                              type="text"
-                              value={formData.name}
-                              readOnly
-                              className="w-full pl-12 pr-4 py-4 bg-[#0a0a0f]/40 border border-yellow-500/10 rounded-2xl text-gray-400 cursor-not-allowed font-medium"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[#fff1ce] font-semibold mb-3 text-sm uppercase tracking-wider">
-                            Team Name
-                          </label>
-                          <div className="relative">
-                            <Award className="absolute w-5 h-5 -translate-y-1/2 left-4 top-1/2 text-yellow-400/50" />
-                            <input
-                              type="text"
-                              value={formData.team}
-                              readOnly
-                              className="w-full pl-12 pr-4 py-4 bg-[#0a0a0f]/40 border border-yellow-500/10 rounded-2xl text-gray-400 cursor-not-allowed font-medium"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <motion.button
-                      whileHover={{ scale: 1.02, translateY: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleVerifyUser}
-                      disabled={!formData.email || isVerifying}
-                      className={`
-                          w-full py-4 rounded-2xl font-black text-lg
-                          transition-all duration-300 flex items-center justify-center gap-3 shadow-xl
-                          ${formData.email && !isVerifying
-                          ? 'bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-[#0a0a0f] hover:shadow-yellow-500/30'
-                          : 'bg-gray-800 text-gray-400 cursor-not-allowed opacity-50'
-                        }
-                          `}
-                    >
-                      {isVerifying ? (
-                        <>
-                          <Loader2 className="w-6 h-6 animate-spin" />
-                          <span>Verifying...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Search className="w-6 h-6" />
-                          <span>{userData ? 'Re-verify' : 'Verify & Preview'}</span>
-                        </>
-                      )}
-                    </motion.button>
-                  </div>
-                </>
-              )}
+              {activeTab === 'phase1' && (() => {
+                const Phase1Component = Phase1Certificate({ 
+                  onShare: handleShare,
+                  pdfPreviewUrl,
+                  setPdfPreviewUrl,
+                  isPreviewLoading,
+                  setIsPreviewLoading,
+                  qrCodeUrl,
+                  setQrCodeUrl
+                });
+                phase1Ref.current = Phase1Component;
+                return Phase1Component.formContent;
+              })()}
 
               {activeTab === 'phase2' && (
                 <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -921,7 +646,87 @@ const Certificate = () => {
               <h2 className="mb-8 text-2xl font-bold text-white">Certificate Preview</h2>
 
               <AnimatePresence mode="wait">
-                {isPreviewLoading ? (
+                {activeTab === 'phase1' ? (
+                  /* Phase 1 preview with actions below */
+                  isPreviewLoading ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center flex-1 p-12 text-center"
+                    >
+                      <div className="relative flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-yellow-500/10">
+                        <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
+                      </div>
+                      <h3 className="text-xl font-bold text-[#fff1ce] mb-2">Generating Actual PDF</h3>
+                      <p className="max-w-xs leading-relaxed text-gray-500">
+                        Preparing your official certificate preview using the high-resolution template...
+                      </p>
+                    </motion.div>
+                  ) : pdfPreviewUrl ? (
+                    <motion.div
+                      key="preview"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="flex flex-col flex-1"
+                    >
+                      <div
+                        ref={containerRef}
+                        className="relative w-full aspect-[1.414/1] bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden mb-8 shadow-2xl flex items-center justify-center"
+                      >
+                        {pdfPreviewUrl && (
+                          <div
+                            style={{
+                              width: '1122px',
+                              height: '793px',
+                              transform: `scale(${iframeScale})`,
+                              transformOrigin: 'top left',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              pointerEvents: 'auto'
+                            }}
+                          >
+                            <iframe
+                              src={`${pdfPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+                              className="w-full h-full border-none"
+                              title="Certificate PDF Preview"
+                            />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 border-2 pointer-events-none border-yellow-500/20 rounded-2xl" />
+                        {isMobile && (
+                          <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2 pointer-events-none">
+                            <ZoomIn className="w-3 h-3 text-yellow-500" />
+                            <span className="text-[10px] text-white font-medium">Interactive Preview</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Phase 1 Certificate Actions Below Preview */}
+                      {phase1Ref.current?.previewActions}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center flex-1 p-12 text-center"
+                    >
+                      <div className="relative flex items-center justify-center w-24 h-24 mb-6 rounded-full bg-yellow-500/5">
+                        <div className="absolute inset-0 rounded-full bg-yellow-500/10 animate-pulse" />
+                        <Search className="w-10 h-10 text-yellow-500/30" />
+                      </div>
+                      <h3 className="text-xl font-bold text-[#fff1ce] mb-2">No Certificate Selected</h3>
+                      <p className="max-w-xs leading-relaxed text-gray-500">
+                        Please enter and verify your registered email address to unlock your certificates.
+                      </p>
+                    </motion.div>
+                  )
+                ) : isPreviewLoading ? (
                   <motion.div
                     key="loading"
                     initial={{ opacity: 0 }}
@@ -1032,7 +837,7 @@ const Certificate = () => {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={handleDownloadCertificate}
+                        onClick={activeTab === 'officials' ? handleDownloadOfficialCertificate : () => {}}
                         disabled={isGenerating}
                         className="flex-1 bg-gradient-to-r from-yellow-500 to-amber-600 text-[#0a0a0f] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl hover:shadow-yellow-500/20 transition-all disabled:opacity-50"
                       >
