@@ -10,11 +10,11 @@ const Phase2Results = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     const themes = [
-        { id: 'TH01', name: 'Open Innovation', color: '#FF9933', icon: '💡' },
-        { id: 'TH02', name: 'Heritage & Culture', color: '#FFFFFF', icon: '🏛️' },
-        { id: 'TH03', name: 'MedTech / BioTech / HealthTech', color: '#138808', icon: '🏥' },
-        { id: 'TH04', name: 'Agriculture, FoodTech & Rural Development', color: '#FF9933', icon: '🌾' },
-        { id: 'TH05', name: 'Blockchain & Cybersecurity', color: '#1E3A8A', icon: '🔐' }
+        { id: 'TH01', name: 'Open Innovation', color: '#FF9933', icon: '💡', maxScore: 60 },
+        { id: 'TH02', name: 'Heritage & Culture', color: '#FFFFFF', icon: '🏛️', maxScore: 60 },
+        { id: 'TH03', name: 'MedTech / BioTech / HealthTech', color: '#138808', icon: '🏥', maxScore: 80 },
+        { id: 'TH04', name: 'Agriculture, FoodTech & Rural Development', color: '#FF9933', icon: '🌾', maxScore: 30 },
+        { id: 'TH05', name: 'Blockchain & Cybersecurity', color: '#1E3A8A', icon: '🔐', maxScore: 40 }
     ];
 
     // Load Phase 2 results from CSV files
@@ -164,6 +164,9 @@ const Phase2Results = () => {
                                             .map((team, index) => {
                                                 const rank = parseInt(team.Rank);
                                                 const isShortlisted = team.Shortlisted?.trim().toLowerCase() === 'yes';
+                                                const currentMaxScore = themes[activeTheme].maxScore;
+                                                const scoreKey = Object.keys(team).find(key => key.includes('Total (out of'));
+                                                const score = team[scoreKey]?.trim();
                                                 
                                                 return (
                                                     <motion.tr
@@ -206,7 +209,7 @@ const Phase2Results = () => {
                                                         </td>
                                                         <td className="px-2 py-3 text-center sm:px-4 sm:py-4">
                                                             <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full sm:px-3 sm:text-sm bg-gradient-to-r from-orange-500 to-amber-600">
-                                                                {team['Total (out of  40) ']?.trim() || team['Total (out of 40)']?.trim()}/40
+                                                                {score}/{currentMaxScore}
                                                             </span>
                                                         </td>
                                                         <td className="px-2 py-3 text-center sm:px-4 sm:py-4">
