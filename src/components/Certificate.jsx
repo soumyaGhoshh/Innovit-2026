@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabaseClient';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import QRCode from 'qrcode';
 import usePhase1Certificate from './Phase1Certificate';
+import usePhase2Certificate from './Phase2Certificate';
 
 const Certificate = () => {
   const navigate = useNavigate();
@@ -338,6 +339,17 @@ const Certificate = () => {
     setQrCodeUrl
   });
 
+  // Call Phase 2 hook at top level
+  const phase2Data = usePhase2Certificate({
+    onShare: handleShare,
+    pdfPreviewUrl,
+    setPdfPreviewUrl,
+    isPreviewLoading,
+    setIsPreviewLoading,
+    qrCodeUrl,
+    setQrCodeUrl
+  });
+
   return (
     <div className="min-h-screen w-full pt-24 pb-12 px-4 relative overflow-hidden bg-[#0a0a0f]">
       <Toaster
@@ -538,15 +550,7 @@ const Certificate = () => {
 
               {activeTab === 'phase1' && phase1Data.formContent}
 
-              {activeTab === 'phase2' && (
-                <div className="flex flex-col items-center justify-center p-12 text-center">
-                  <div className="p-4 mb-4 rounded-full bg-yellow-500/10">
-                    <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">Coming Soon</h3>
-                  <p className="mt-2 text-gray-400">Phase 2 certificates will be available shortly.</p>
-                </div>
-              )}
+              {activeTab === 'phase2' && phase2Data.formContent}
 
               {activeTab === 'officials' && (
                 <>
@@ -724,6 +728,86 @@ const Certificate = () => {
                       </p>
                     </motion.div>
                   )
+                ) : activeTab === 'phase2' ? (
+                  /* Phase 2 preview with actions below */
+                  isPreviewLoading ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center flex-1 p-12 text-center"
+                    >
+                      <div className="relative flex items-center justify-center w-20 h-20 mb-6 rounded-2xl bg-yellow-500/10">
+                        <Loader2 className="w-10 h-10 text-yellow-500 animate-spin" />
+                      </div>
+                      <h3 className="text-xl font-bold text-[#fff1ce] mb-2">Generating Actual PDF</h3>
+                      <p className="max-w-xs leading-relaxed text-gray-500">
+                        Preparing your official certificate preview using the high-resolution template...
+                      </p>
+                    </motion.div>
+                  ) : pdfPreviewUrl ? (
+                    <motion.div
+                      key="preview"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="flex flex-col flex-1"
+                    >
+                      <div
+                        ref={containerRef}
+                        className="relative w-full aspect-[1.414/1] bg-[#1a1a1a] rounded-2xl border border-white/10 overflow-hidden mb-8 shadow-2xl flex items-center justify-center"
+                      >
+                        {pdfPreviewUrl && (
+                          <div
+                            style={{
+                              width: '1122px',
+                              height: '793px',
+                              transform: `scale(${iframeScale})`,
+                              transformOrigin: 'top left',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              pointerEvents: 'auto'
+                            }}
+                          >
+                            <iframe
+                              src={`${pdfPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+                              className="w-full h-full border-none"
+                              title="Certificate PDF Preview"
+                            />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 border-2 pointer-events-none border-yellow-500/20 rounded-2xl" />
+                        {isMobile && (
+                          <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2 pointer-events-none">
+                            <ZoomIn className="w-3 h-3 text-yellow-500" />
+                            <span className="text-[10px] text-white font-medium">Interactive Preview</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Phase 2 Certificate Actions Below Preview */}
+                      {phase2Data.previewActions}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center flex-1 p-12 text-center"
+                    >
+                      <div className="relative flex items-center justify-center w-24 h-24 mb-6 rounded-full bg-yellow-500/5">
+                        <div className="absolute inset-0 rounded-full bg-yellow-500/10 animate-pulse" />
+                        <Search className="w-10 h-10 text-yellow-500/30" />
+                      </div>
+                      <h3 className="text-xl font-bold text-[#fff1ce] mb-2">No Certificate Selected</h3>
+                      <p className="max-w-xs leading-relaxed text-gray-500">
+                        Please enter and verify your registered email address to unlock your certificates.
+                      </p>
+                    </motion.div>
+                  )
                 ) : isPreviewLoading ? (
                   <motion.div
                     key="loading"
@@ -835,7 +919,7 @@ const Certificate = () => {
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={activeTab === 'officials' ? handleDownloadOfficialCertificate : () => {}}
+                        onClick={activeTab === 'officials' ? handleDownloadOfficialCertificate : () => { }}
                         disabled={isGenerating}
                         className="flex-1 bg-gradient-to-r from-yellow-500 to-amber-600 text-[#0a0a0f] py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl hover:shadow-yellow-500/20 transition-all disabled:opacity-50"
                       >
