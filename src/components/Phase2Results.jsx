@@ -5,7 +5,7 @@ import Papa from 'papaparse';
 
 const Phase2Results = () => {
     const [activeSubTab, setActiveSubTab] = useState('leaderboard'); // 'leaderboard' or 'finalist'
-    const [activeTheme, setActiveTheme] = useState(4); // Default to TH05 since it has data
+    const [activeTheme, setActiveTheme] = useState(0); // Default to TH05 since it has data
     const [results, setResults] = useState({});
     const [isLoading, setIsLoading] = useState(true);
 
