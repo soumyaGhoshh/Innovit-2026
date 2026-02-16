@@ -13,7 +13,7 @@ const Phase2Results = () => {
         { id: 'TH01', name: 'Open Innovation', color: '#FF9933', icon: '💡', maxScore: 60 },
         { id: 'TH02', name: 'Heritage & Culture', color: '#FFFFFF', icon: '🏛️', maxScore: 60 },
         { id: 'TH03', name: 'MedTech / BioTech / HealthTech', color: '#138808', icon: '🏥', maxScore: 80 },
-        { id: 'TH04', name: 'Agriculture, FoodTech & Rural Development', color: '#FF9933', icon: '🌾', maxScore: 30 },
+        { id: 'TH04', name: 'Agriculture, FoodTech & Rural Development', color: '#FF9933', icon: '🌾', maxScore: 60 },
         { id: 'TH05', name: 'Blockchain & Cybersecurity', color: '#1E3A8A', icon: '🔐', maxScore: 40 }
     ];
 
